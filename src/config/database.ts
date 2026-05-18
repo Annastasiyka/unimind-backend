@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Перевіряємо, чи є рядок підключення в .env
 const dbUrl = process.env.DATABASE_URL;
 
 if (!dbUrl) {
@@ -13,16 +12,14 @@ if (!dbUrl) {
 export const sequelize = new Sequelize(dbUrl as string, {
   dialect: 'postgres',
   logging: false,
-  // Налаштування для роботи з хмарними базами (Supabase/Render)
   dialectOptions: {
     ssl: {
       require: true,
-      rejectUnauthorized: false // Це дозволить підключитися до Supabase без помилок сертифіката
+      rejectUnauthorized: false 
     }
   }
 });
 
-// Перевірка підключення
 const testConnection = async () => {
   try {
     await sequelize.authenticate();

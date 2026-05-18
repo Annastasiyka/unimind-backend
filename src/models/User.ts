@@ -1,16 +1,23 @@
 import { DataTypes, Model } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'ai';
+  text: string;
+  options?: string[];
+}
+
 export class User extends Model {
-  // Використовуємо declare, щоб TypeScript не перекривав логіку Sequelize
   declare id: number;
   declare name: string;
   declare email: string;
   declare password: string;
   declare avatar: string | null;
   declare workSchedule: any; 
-  declare semesters: any; // Масив для семестрів та предметів
-  declare plans: any;     // Масив для планів користувача
+  declare semesters: any; 
+  declare plans: any; 
+  declare chatHistory: ChatMessage[]; 
 }
 
 User.init({
@@ -33,19 +40,23 @@ User.init({
     allowNull: false,
   },
   avatar: {
-    type: DataTypes.TEXT, // Для зберігання base64 рядка зображення
+    type: DataTypes.TEXT, 
     allowNull: true,
   },
   workSchedule: {
-    type: DataTypes.JSONB, // Зберігає об'єкт з графіком (дні та години)
+    type: DataTypes.JSONB, 
     defaultValue: {},
   },
   semesters: {
-    type: DataTypes.JSONB, // Зберігає повну структуру семестрів та їхніх предметів
+    type: DataTypes.JSONB, 
     defaultValue: [],
   },
   plans: {
-    type: DataTypes.JSONB, // Зберігає всі плани та завдання користувача
+    type: DataTypes.JSONB, 
+    defaultValue: [],
+  },
+  chatHistory: {
+    type: DataTypes.JSONB,
     defaultValue: [],
   }
 }, {

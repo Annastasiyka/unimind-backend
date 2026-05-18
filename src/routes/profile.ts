@@ -4,14 +4,10 @@ import { User } from '../models/User.js';
 
 const router = express.Router();
 
-/**
- * 1. Отримати дані профілю за ID
- * Використовується при завантаженні сторінки для синхронізації
- */
 router.get('/:userId', async (req, res) => {
   try {
     const user = await User.findByPk(req.params.userId, {
-      attributes: { exclude: ['password'] } // Не відправляємо хеш пароля на фронтенд
+      attributes: { exclude: ['password'] } 
     });
     
     if (!user) {
@@ -25,9 +21,6 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
-/**
- * 2. Оновлення графіка роботи
- */
 router.post('/update-schedule', async (req: any, res: any) => {
   const { userId, schedule } = req.body;
   
@@ -48,9 +41,7 @@ router.post('/update-schedule', async (req: any, res: any) => {
   }
 });
 
-/**
- * 3. Оновлення особистих даних (Ім'я та Аватарка)
- */
+
 router.post('/update-info', async (req: any, res: any) => {
   const { userId, name, avatar } = req.body;
 
@@ -59,7 +50,7 @@ router.post('/update-info', async (req: any, res: any) => {
     if (!user) return res.status(404).json({ message: "Користувача не знайдено" });
 
     if (name) user.name = name;
-    if (avatar) user.avatar = avatar; // Тут зберігається Base64 рядок
+    if (avatar) user.avatar = avatar; 
     
     await user.save();
 
@@ -73,9 +64,6 @@ router.post('/update-info', async (req: any, res: any) => {
   }
 });
 
-/**
- * 4. Зміна пароля (з перевіркою старого)
- */
 router.post('/update-password', async (req: any, res: any) => {
   const { userId, currentPassword, newPassword } = req.body;
 
@@ -83,11 +71,9 @@ router.post('/update-password', async (req: any, res: any) => {
     const user = await User.findByPk(userId);
     if (!user) return res.status(404).json({ message: "Користувача не знайдено" });
 
-    // Перевірка старого пароля
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) return res.status(400).json({ message: "Неправильний поточний пароль" });
 
-    // Хешування нового пароля
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     
