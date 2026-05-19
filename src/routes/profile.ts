@@ -63,6 +63,14 @@ router.post('/update-info', async (req: any, res: any) => {
     res.status(500).json({ message: "Помилка при оновленні даних" });
   }
 });
+router.post("/clear-chat", async (req: any, res: any) => {
+  const { userId } = req.body;
+  const user = await User.findByPk(userId);
+  if (user) {
+    await user.update({ chatHistory: [] });
+    res.json({ success: true });
+  }
+});
 
 router.post('/update-password', async (req: any, res: any) => {
   const { userId, currentPassword, newPassword } = req.body;
