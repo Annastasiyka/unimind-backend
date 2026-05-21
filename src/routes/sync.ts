@@ -3,7 +3,6 @@ import { User } from '../models/User.js';
 
 const router = express.Router();
 
-// Головний маршрут для синхронізації всього
 router.post('/all', async (req, res) => {
   try {
     const { userId, semesters, plans, workSchedule } = req.body;
@@ -13,7 +12,6 @@ router.post('/all', async (req, res) => {
       return res.status(404).json({ message: "Користувача не знайдено" });
     }
 
-    // Оновлюємо колонки в PostgreSQL (вони мають бути в моделі User.ts)
     if (semesters !== undefined) user.semesters = semesters;
     if (plans !== undefined) user.plans = plans;
     if (workSchedule !== undefined) user.workSchedule = workSchedule;

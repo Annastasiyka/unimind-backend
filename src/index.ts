@@ -24,7 +24,6 @@ app.get('/', (req, res) => {
   res.status(200).send('UniMind API is running... 🚀');
 });
 
-// Реєстрація роутів
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/sync', syncRoutes);
@@ -43,7 +42,6 @@ const connectDB = async () => {
 
 connectDB();
 
-// ЗАЛИШАЄМО ТІЛЬКИ ОДИН LISTEN В КІНЦІ
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
