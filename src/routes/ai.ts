@@ -9,58 +9,96 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 router.post("/chat", async (req, res) => {
   const { 
-    message, userId, workSchedule, realTime, realDate, 
-    allPlans, pastOverdue,
+    message, userId,  realTime, realDate, 
+    allPlans, pastOverdue, workSchedule,
     isAutoOptimize, tasksToSchedule, plansForToday 
   } = req.body;
 
   try {
     const user = userId ? await User.findByPk(userId) : null;
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
+    const [d, m, y] = realDate.split('-');
+    const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+    const dayNames = ["Неділя", "Понеділок", "Вівторок", "Середа", "Четвер", "П'ятниця", "Субота"];
+    const dayOfWeek = dayNames[dateObj.getDay()];
 
     let prompt = "";
-
     if (isAutoOptimize) {
       prompt = `
-        Ти - системний скрипт оптимізації. Працюй ТІЛЬКИ в JSON.
-        ПОТОЧНА ДАТА: ${realDate}, ЧАС: ${realTime}.
+        Ти — системний алгоритм планування розкладу UniMind. Відповідай ТІЛЬКИ валідним JSON.
+        Поточний час: ${realTime}, поточна дата: ${realDate} (${dayOfWeek}).
         
-        ЩО ТРЕБА ЗРОБИТИ:
-        1. Розподіли завдання без часу: ${JSON.stringify(tasksToSchedule || [])}.
-        2. Розподіли протерміновані справи: ${JSON.stringify(pastOverdue || [])}.
-        3. Зайняті години: ${JSON.stringify(plansForToday || [])}.
+        ВХІДНІ ДАНІ:
+        1. Зайняті плани (уникай перетинів з ними!): ${JSON.stringify(plansForToday || [])}
+        2. Графік роботи: ${JSON.stringify(workSchedule || {})}
+        3. Завдання БЕЗ вказаного часу: ${JSON.stringify(tasksToSchedule || [])}
+        4. ПРОТЕРМІНОВАНІ завдання: ${JSON.stringify(pastOverdue || [])}
         
-        Поверни список { "updatedPlans": [...] }.
+        ТВОЯ ЗАДАЧА:
+        Взяти КОЖНЕ завдання з масивів (3) і (4), знайти для нього вільний час і призначити нову дату (сьогодні ${realDate} або завтра).
+        
+        КРИТИЧНІ ПРАВИЛА:
+        1. ЗБЕРІГАЙ ОРИГІНАЛЬНІ ID: Ти ПОВИНЕН повернути той самий "id", який має завдання у вхідних даних! Інакше система зламається.
+        2. ТРИВАЛІСТЬ: Кожне завдання типу "Навчання" або "Лабораторна" займає 1.5 години (90 хв). Всі інші типи займають 1 годину (60 хв).
+        3. БЕЗ ПЕРЕТИНІВ: Додавай тривалість до часу початку. Наступне завдання став ТІЛЬКИ після завершення попереднього у вільне "вікно".
+        4. ЛОГІКА ЧАСУ: Не виходь за межі "Графік роботи" і не став час у минулому (раніше ${realTime} сьогодні). Якщо сьогодні місця немає — перенось на завтра.
+        
+        Поверни JSON строго у цьому форматі:
+        {
+          "updatedPlans": [
+            { 
+              "id": "ОРИГІНАЛЬНИЙ_ID_З_ВХІДНОГО_МАСИВУ", 
+              "date": "ДД-ММ-РРРР", 
+              "time": "15:30", 
+              "action": "add_or_update" 
+            }
+          ]
+        }
       `;
     } else {
       prompt = `
-        Ти — дружній, емпатичний асистент UniMind. 
+        Ти — системний асистент планувальника UniMind. Працюй ТІЛЬКИ в JSON.
         Поточний час: ${realTime}, дата: ${realDate}.
+        
         АКТУАЛЬНІ ПЛАНИ: ${JSON.stringify(allPlans || [])}
-        ПРАВИЛО: Використовуй існуючі ID. Для нових - генеруй ID. 
+        
+        ПОВІДОМЛЕННЯ КОРИСТУВАЧА: "${message}"
 
-        Твоя поведінка:
-        1. ЯКЩО це розмова ("привіт", "як справи", "порадь фільм"): 
-           - Відповідай дружньо в полі "reply".
+        ПРАВИЛО: Використовуй існуючі ID планів. Для нових - генеруй унікальні ID.
+
+        Твоя поведінка залежить від запиту:
+        1. ЯКЩО це розмова (наприклад, "привіт", "як справи", "порадь фільм"): 
+           - Будь дружнім та емпатичним у полі "reply".
            - Поле "updatedPlans" має бути ЗАВЖДИ порожнім списком: [].
         
-        2. ЯКЩО це запит на ДІЮ ("видали", "перенеси", "додай"):
-           - Ти ПОВИНЕН знайти ціль у списку АКТУАЛЬНИХ ПЛАНІВ.
-           - Для видалення: поверни {"id": "ID_З_СПИСКУ", "action": "delete"}.
-           - Для перенесення: знайди об'єкт, зміни час/дату, поверни його з тим самим ID та {"action": "add_or_update"}.
-           - Для додавання: створи новий об'єкт з новим ID ("new-" + Date.now()) та {"action": "add_or_update"}.
-        
-        ВІДПОВІДАЙ ТІЛЬКИ ВАЛІДНИМ JSON ОБ'ЄКТОМ:
+        2. ЯКЩО це запит на ДІЮ з планами (наприклад, "видали", "перенеси", "додай"):
+           - У полі "reply" коротко прокоментуй дію.
+           - У полі "updatedPlans" поверни масив дій. Приклад:
+             [
+               { "id": "ID_З_СПИСКУ", "action": "delete" },
+               { "id": "ID_З_СПИСКУ", "text": "Оновлений текст", "date": "ДД-ММ-РРРР", "time": "14:00", "action": "add_or_update" },
+               { "id": "new-12345", "text": "Нове завдання", "date": "ДД-ММ-РРРР", "time": "15:00", "type": "Навчання", "action": "add_or_update" }
+             ]
+
+        ВІДПОВІДАЙ ТІЛЬКИ ВАЛІДНИМ JSON:
         {
-          "reply": "Твоя відповідь користувачу",
+          "reply": "Текст твоєї відповіді",
           "updatedPlans": []
         }
       `;
     }
 
     const result = await model.generateContent(prompt);
-    const rawText = result.response.text().replace(/[\s\S]*?({[\s\S]*})[\s\S]*/, "$1");
-    const aiData = JSON.parse(rawText);
+    
+    // Більш надійний парсинг JSON (відрізаємо markdown і шукаємо межі об'єкта)
+    let cleanText = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
+    const startIndex = cleanText.indexOf('{');
+    const endIndex = cleanText.lastIndexOf('}');
+    if (startIndex !== -1 && endIndex !== -1) {
+       cleanText = cleanText.substring(startIndex, endIndex + 1);
+    }
+    
+    const aiData = JSON.parse(cleanText);
 
     let currentPlans = user ? (user.plans || []) : [];
 
